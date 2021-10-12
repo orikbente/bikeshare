@@ -1,0 +1,380 @@
+---
+title: "Divvy Bike Sharing"
+author: "Auric Ousler de Jesus"
+date: "9/24/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "D:/RStudio/Files/bikeshare/rstudiodf")
+```
+
+```{r library}
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(skimr)
+library(janitor)
+library(DBI)
+library(odbc)
+library(dbplyr)
+```
+
+## Connecting to MS SQL Server Express
+All files are merged in SQL server
+
+```{r sql_connection}
+sql_tripdata <- dbConnect(odbc(),
+                 Driver = "SQL Server",
+                 Server = "DESKTOP-TH2MTJ2\\SQLEXPRESS",
+                 Trusted_Connection = "True")
+```
+
+## Cleaning and adding rows of the dataframe.
+Removed duplicate ride_id.
+Calculated ride_length in seconds duration.
+Calculated the day of the ride.
+All rides that is less that 60 seconds are removed.
+
+```{sql connection=sql_tripdata, output.var = "df_tripdata"}
+SELECT
+DISTINCT(TRIM(ride_id)) AS ride_id,
+TRIM(rideable_type) AS rideable_type,
+CAST(started_at AS date) AS started_date,
+CAST(started_at AS time(0)) AS started_time,
+CAST(ended_at AS date) AS ended_date,
+CAST(ended_at AS time(0)) AS ended_time,
+TRIM(start_station_name) AS start_station_name,
+TRIM(start_station_id) AS start_station_id,
+TRIM(end_station_name) AS end_station_name,
+TRIM(end_station_id) AS end_station_id,
+CAST(start_lat AS decimal(10,3)) AS trip_start_lat,
+CAST(start_lng AS decimal(10,3)) AS trip_start_lng,
+CAST(end_lat AS decimal(10,3)) AS trip_end_lat,
+CAST(end_lng AS decimal(10,3)) AS trip_end_lng,
+TRIM(member_casual) AS member_casual,
+DATEDIFF_BIG(SECOND, started_at, ended_at) AS ride_length,
+DATENAME(WEEKDAY,started_at) AS day_of_week,
+DATENAME(MONTH, started_at) AS month,
+DATENAME(YEAR, started_at) AS year
+
+
+FROM
+bikeshare.dbo.divvy_tripdata
+
+WHERE 
+DATEDIFF_BIG(SECOND, started_at, ended_at) > 60
+ORDER BY 
+started_date, started_time
+```
+
+## Due to large number of obsevations and limited computing power, we are going to get sample data.
+### Here is how the sample size was calculated
+### Population size : 4,807,362
+### Confidence level : 99%
+### Margin of Error : 0.2
+### Sample size: 382891
+
+### Add ride_count column into the data frame with default value of 1(int)
+Ride counter is used in calculating the average of rides
+
+```{r sample_data_creation}
+df_tripdata <- df_tripdata %>% 
+  slice_sample(n = 382891, replace = FALSE) %>% 
+  mutate(ride_count = 1) %>% 
+  unite("year_month",year:month, sep = " ", remove = FALSE)
+
+write_csv(df_tripdata, "df_tripdata.csv")
+```
+
+## Importing whole year  average temperature in Chicago area
+Data is from Google search
+
+```{r}
+df_chicago_temp <- read_csv("D:/RStudio/Files/bikeshare/chicago_temperature.csv")
+df_chicago_temp$month <- factor(df_chicago_temp$month,levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"))
+df_chicago_temp
+```
+
+
+## Dataframe variables
+```{r tripdata_properties, fig.width=12}
+head(df_tripdata)
+tail(df_tripdata)
+colnames(df_tripdata)
+nrow(df_tripdata)
+ncol(df_tripdata)
+dim(df_tripdata) 
+str(df_tripdata)  
+summary(df_tripdata)
+```
+
+## Now we will create tables per requirement
+
+### Creating dataframe df_triprides
+columns selected are started_date, month, day_of_week, member_casual, ride_count
+
+```{r}
+df_triprides <- df_tripdata %>% 
+  select(started_date, year_month, year, month, day_of_week, member_casual, ride_count)
+head(df_triprides)
+
+write_csv(df_triprides, "df_triprides.csv")
+```
+
+### Creating dataframe df_triplength
+columns selected are started_date, month, day_of_week, member_casual, ride_length
+
+```{r}
+df_triplength <- df_tripdata %>% 
+  select(started_date, year_month, year, month, day_of_week, member_casual, ride_length)
+head(df_triplength)
+
+write_csv(df_triplength, "df_triplength.csv" )
+```
+
+### Creating dataframe df_tripstation
+columns selected are started_date, month, day_of_week, member_casual, start_station_name, ride_count
+
+```{r}
+df_tripstation <- df_tripdata %>% 
+  select(started_date, year_month, year, month, day_of_week, member_casual, start_station_name, trip_start_lat, trip_start_lng, ride_count)
+head(df_tripstation)
+
+write_csv(df_tripstation, "df_tripstation.csv")
+```
+
+### Aggregating the total number of rides through out the year
+```{r total_ride_count}
+attach(df_triprides)
+df_agg_ridecount <- aggregate(x = ride_count,
+                           by = list(started_date,year_month, year, month, day_of_week, member_casual),
+                           FUN = sum)
+detach(df_triprides)
+names(df_agg_ridecount) <- c("date","year_month", "year", "month", "day_of_week", "member_casual", "ride_count")
+head(df_agg_ridecount[order(df_agg_ridecount$date),])
+
+write_csv(df_agg_ridecount, "df_agg_ridecount.csv")
+```
+
+### Aggregating the total number of ride length through out the year
+```{r total_ride_length}
+attach(df_triplength)
+df_agg_ridelength <- aggregate(x = ride_length,
+                           by = list(started_date, year_month, year, month, day_of_week, member_casual),
+                           FUN = sum)
+detach(df_triplength)
+names(df_agg_ridelength) <- c("date","year_month", "year", "month", "day_of_week", "member_casual",  "ride_length")
+head(df_agg_ridelength[order(df_agg_ridelength$date),])
+
+write_csv(df_agg_ridelength, "df_agg_ridelength.csv")
+```
+
+### Aggregating the total number of rides per station through out the year
+```{r total_stations_ride_count}
+attach(df_tripstation)
+df_agg_stations <- aggregate(x = ride_count,
+                             by = list(started_date, year_month, year,month , day_of_week, start_station_name, trip_start_lat, trip_start_lng, member_casual),
+                             FUN = sum)
+detach(df_tripstation)
+names(df_agg_stations) <- c("date","year_month", "year", "month", "day_of_week", "station","latitude", "longtitude", "member_casual","ride_count")
+head(df_agg_stations[order(df_agg_stations$date),])
+
+write_csv(df_agg_stations, "df_agg_stations.csv")
+```
+
+### Calculating the average rides per month of members and casual riders
+
+```{r average_monthly_member_ride_count}
+attach(df_agg_ridecount)
+df_avemonthlymember_ridecount <- aggregate(x = ride_count,
+                            by = list(year_month, year, month, member_casual),
+                            FUN = mean)
+detach(df_agg_ridecount)
+names(df_avemonthlymember_ridecount) <- c("year_month", "year", "month","member_casual","ride_count")
+df_avemonthlymember_ridecount$month <- factor(df_avemonthlymember_ridecount$month,levels = c("September", "October", "November", "December", "January", "February", "March", "April", "May", "June", "July", "August"))
+head(df_avemonthlymember_ridecount)
+
+write_csv(df_avemonthlymember_ridecount, "df_avemonthlymember_ridecount.csv")
+```
+### Calculating the average rides per week of members and casual riders
+
+```{r average_member_weekly_ride_count}
+attach(df_agg_ridecount)
+df_aveweeklymember_ridecount <- aggregate(x = ride_count,
+                            by = list(day_of_week, member_casual),
+                            FUN = mean)
+detach(df_agg_ridecount)
+names(df_aveweeklymember_ridecount) <- c("day_of_week", "member_casual", "ride_count")
+df_aveweeklymember_ridecount$day_of_week <- factor(df_aveweeklymember_ridecount$day_of_week,levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+head(df_aveweeklymember_ridecount)
+
+write_csv(df_aveweeklymember_ridecount, "df_aveweeklymember_ridecount.csv")
+```
+### Calculating the average ride durations per month of members and casual riders
+
+```{r average_monthly_member_ride_length}
+attach(df_agg_ridelength)
+df_avemonthlymember_ridelength <- aggregate(x = ride_length,
+                            by = list(year_month, year, month, member_casual),
+                            FUN = mean)
+detach(df_agg_ridelength)
+names(df_avemonthlymember_ridelength) <- c("year_month", "year", "month","member_casual","ride_length")
+df_avemonthlymember_ridelength$month <- factor(df_avemonthlymember_ridelength$month,levels = c("September", "October", "November", "December", "January", "February", "March", "April", "May", "June", "July", "August"))
+df_avemonthlymember_ridelength <- df_avemonthlymember_ridelength %>% 
+  mutate(ride_length_mins = ride_length/60)
+df_avemonthlymember_ridelength <- df_avemonthlymember_ridelength %>% 
+  mutate(ride_length_mins = ride_length/60)
+df_avemonthlymember_ridelength <- df_avemonthlymember_ridelength %>% 
+  mutate(ride_length_hour = ride_length_mins/60)
+head(df_avemonthlymember_ridelength)
+
+
+write_csv(df_avemonthlymember_ridelength, "df_avemonthlymember_ridelength.csv")
+```
+
+### Calculating the average ride duration per week of members and casual riders
+
+```{r average_member_weekly_ride_length}
+attach(df_agg_ridelength)
+df_aveweeklymember_ridelength <- aggregate(x = ride_length,
+                            by = list(day_of_week, member_casual),
+                            FUN = mean)
+detach(df_agg_ridelength)
+names(df_aveweeklymember_ridelength) <- c("day_of_week","member_casual", "ride_length")
+df_aveweeklymember_ridelength$day_of_week <- factor(df_aveweeklymember_ridelength$day_of_week,levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+df_aveweeklymember_ridelength <- df_aveweeklymember_ridelength %>% 
+  mutate(ride_length_mins = ride_length/60)
+df_aveweeklymember_ridelength <- df_aveweeklymember_ridelength %>% 
+  mutate(ride_length_hour = ride_length_mins/60)
+head(df_aveweeklymember_ridelength)
+
+write_csv(df_aveweeklymember_ridelength, "df_aveweeklymember_ridelength.csv")
+```
+### Calculating the top 10 stations
+
+```{r top_stations_ride_count}
+attach(df_agg_stations)
+df_top_stations <- aggregate(x = ride_count,
+                                   by = list(station),
+                                   FUN = sum)
+detach(df_agg_stations)
+names(df_top_stations) <- c("station", "ride_count")
+
+df_top_stations[order(-df_top_stations$ride_count),] %>% 
+  top_n(10)
+
+write_csv(df_top_stations, "df_top_stations.csv")
+```
+
+### Calculating the top stations 10 for members and casual riders
+
+```{r top_stations_member_ride_count}
+attach(df_agg_stations)
+df_top_member_stations <- aggregate(x = ride_count,
+                                   by = list(station, latitude, longtitude, member_casual),
+                                   FUN = sum)
+detach(df_agg_stations)
+names(df_top_member_stations) <- c("station", "latitude", "longtitude", "member_casual","ride_count")
+df_top_member_stations_member <- df_top_member_stations %>% 
+  filter(member_casual == "member") %>% 
+  top_n(10)
+
+df_top_member_stations_casual <- df_top_member_stations %>% 
+  filter(member_casual == "casual") %>% 
+  top_n(10)
+
+df_member_station_bind <- rbind(df_top_member_stations_member,df_top_member_stations_casual)
+
+head(df_member_station_bind)
+
+
+write_csv(df_member_station_bind, "df_member_station_bind.csv")
+
+```
+
+### Calculating the top stations 10 of the week days for members and casual riders
+
+```{r stations_weekly_ride_count}
+attach(df_agg_stations)
+df_weekly_stations_ridecount <- aggregate(x = ride_count,
+                                   by = list(day_of_week, latitude, longtitude, member_casual, station),
+                                   FUN = sum)
+detach(df_agg_stations)
+names(df_weekly_stations_ridecount) <- c("day_of_week", "latitude", "longtitude", "member_casual", "station", "ride_count")
+
+df_weekly_stations_membermax <- df_weekly_stations_ridecount %>% 
+  group_by(day_of_week) %>%
+  filter(member_casual == "member") %>% 
+  filter(ride_count == max(ride_count)) %>% 
+  top_n(10)
+
+df_weekly_stations_casualmax <- df_weekly_stations_ridecount %>% 
+  group_by(day_of_week) %>%
+  filter(member_casual == "casual") %>% 
+  filter(ride_count == max(ride_count)) %>% 
+  top_n(10)
+
+df_weekly_stations_bind <- rbind(df_weekly_stations_membermax,df_weekly_stations_casualmax)
+
+df_weekly_stations_bind
+
+write_csv(df_weekly_stations_bind, "df_weekly_stations_bind.csv")
+```
+
+```{r ggplot_avemonthly, fig.height=4, fig.width=10}
+ggplot() +
+  geom_col(data = df_avemonthlymember_ridecount , mapping = aes(x = month, y = ride_count, fill = member_casual), position = "dodge", alpha = .7)+
+  geom_line(data = df_avemonthlymember_ridelength, mapping = aes(x = month, y = ride_length_hour, group = member_casual, color = member_casual, linetype = member_casual), size = 1.2)+
+  geom_point(data = df_avemonthlymember_ridelength, mapping = aes(x = month, y = ride_length_hour, shape = member_casual), size = 3)+
+  labs(title = "Average bicycle rides and ride length(hours) per month", x = "Month", fill = "Membership Type", color = "Membership Type", size = "Membership Type", linetype = "Membership Type" , shape = "Membership Type") +
+  scale_y_continuous(name = "Number of Rides", sec.axis = sec_axis( trans=~.*1, name="Ride Length (hour)")) +
+  scale_color_manual(values = c(casual = "yellow", member = "blue")) +
+  geom_vline(xintercept = 4.5, linetype = "dashed") +
+  annotate("text", x = 4, y = 950, label = "2020") +
+  annotate("text", x = 5, y = 950, label = "2021") +
+  theme_minimal()
+```
+
+```{r temperature_numrides, fig.height=4, fig.width=10}
+ggplot() +
+  geom_line(data = df_chicago_temp, mapping = aes(x = month, y = average, group = 1, color = average), size = 2)+
+  geom_point(data = df_chicago_temp, mapping = aes(x = month, y = average, group = 1, color = average), size = 5)+
+  scale_colour_gradient2(low= "blue", high = "red")
+```
+
+
+
+```{r ggplot_aveweekly, fig.height=4, fig.width=10}
+ggplot() +
+  geom_col(data = df_aveweeklymember_ridecount, mapping = aes(x = day_of_week, y = ride_count, fill = member_casual), position = "dodge", alpha = .7)+
+  geom_line(data = df_aveweeklymember_ridelength, mapping = aes(x = day_of_week, y = ride_length_hour, group = member_casual, linetype = member_casual), size = 1.2)+
+  geom_point(data = df_aveweeklymember_ridelength, mapping = aes(x = day_of_week, y = ride_length_hour, shape = member_casual, color = member_casual), size = 3)+
+  labs(title = "Average bicycle rides and ride length(hours) per week", x = "Week Day", fill = "Membership Type", shape = "Membership Type",  color = "Membership Type", linetype = "Membership Type") +
+  scale_y_continuous(name = "Number of Rides", sec.axis = sec_axis( trans=~.*1, name="Ride Length (hour)")) +
+  scale_color_manual(values = c(casual = "green", member = "blue"))
+```
+
+```{r ggplot_member_station, fig.height=5, fig.width=10}
+ggplot()+
+  geom_col(data = df_member_station_bind, mapping = aes(y = station, x = ride_count, fill = member_casual), position = "dodge")
+
+```
+
+```{r ggplot_weekly_station, fig.height=5, fig.width=10}
+
+
+ggplot(data = df_weekly_stations_bind, aes(day_of_week, ride_count, group = member_casual)) +
+ geom_col(aes(fill = member_casual), position = "dodge") +
+ geom_text(aes(label = station), check_overlap = TRUE, angle = 90, position = position_dodge(.9))
+
+```
+
+```{r}
+ggplot(df_tripdata)+
+geom_bar(aes(x = member_casual, fill = member_casual))
+```
