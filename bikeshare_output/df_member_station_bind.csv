@@ -1,0 +1,21 @@
+station,latitude,longtitude,member_casual,ride_count
+Broadway & Barry Ave,41.938,-87.644,member,1364
+Kingsbury St & Kinzie St,41.889,-87.639,member,1314
+Clark St & Armitage Ave,41.918,-87.636,member,1206
+Wells St & Concord Ln,41.912,-87.635,member,1638
+Clark St & Lincoln Ave,41.916,-87.635,member,1229
+Wells St & Huron St,41.895,-87.634,member,1297
+Clark St & Elm St,41.903,-87.631,member,1531
+Theater on the Lake,41.926,-87.631,member,1336
+Dearborn St & Erie St,41.894,-87.629,member,1400
+St. Clair St & Erie St,41.894,-87.623,member,1312
+Wells St & Concord Ln,41.912,-87.635,casual,1414
+Clark St & Lincoln Ave,41.916,-87.635,casual,1266
+Theater on the Lake,41.926,-87.631,casual,1691
+Lake Shore Dr & North Blvd,41.912,-87.627,casual,1460
+Millennium Park,41.881,-87.624,casual,2469
+Michigan Ave & Oak St,41.901,-87.624,casual,2168
+Indiana Ave & Roosevelt Rd,41.868,-87.623,casual,1347
+Lake Shore Dr & Monroe St,41.881,-87.617,casual,2101
+Shedd Aquarium,41.867,-87.615,casual,1659
+Streeter Dr & Grand Ave,41.892,-87.612,casual,4510

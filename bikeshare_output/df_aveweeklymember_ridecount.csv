@@ -1,0 +1,15 @@
+day_of_week,member_casual,ride_count
+Friday,casual,485.11538461538464
+Monday,casual,380.71153846153845
+Saturday,casual,746.4807692307693
+Sunday,casual,639.0961538461538
+Thursday,casual,373.09615384615387
+Tuesday,casual,357.5660377358491
+Wednesday,casual,364.9423076923077
+Friday,member,594.6346153846154
+Monday,member,542.5192307692307
+Saturday,member,579.75
+Sunday,member,498.25
+Thursday,member,586.5576923076923
+Tuesday,member,587.3018867924528
+Wednesday,member,609.0961538461538
