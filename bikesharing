@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = "D:/RStudio/Files/bikeshare/rstudiodf")
+knitr::opts_knit$set(root.dir = "/RStudio/Files/bikeshare/rstudiodf")
 ```
 
 ```{r library}
@@ -30,7 +30,7 @@ All files are merged in SQL server
 ```{r sql_connection}
 sql_tripdata <- dbConnect(odbc(),
                  Driver = "SQL Server",
-                 Server = "DESKTOP-TH2MTJ2\\SQLEXPRESS",
+                 Server = "DESKTOP\\SQLEXPRESS",
                  Trusted_Connection = "True")
 ```
 
